@@ -1,0 +1,7 @@
+# Variaveis de Ambiente
+.env
+.DS_Store
+# Dados IBGE - não versionar
+arquivos_ibge/*.csv
+arquivos_ibge/*.xls
+arquivos_ibge/*.xlsx
