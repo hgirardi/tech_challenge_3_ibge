@@ -5,9 +5,9 @@ import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional
-
 import psycopg2
 from dotenv import load_dotenv
+from pyspark.sql import SparkSession
 
 # ----------------------------
 # 1) Silenciar warnings/logs
@@ -57,6 +57,8 @@ def pgconfig_init(dotenv_path: Optional[str] = None,
         "batchsize": "5000",
     }
 
+    print("✅ Configuração do Postgres carregada.")
+    
     return PgConfig(
         host=host, 
         port=port,
@@ -119,3 +121,53 @@ def pg_executar_sql(conn, sql: str):
         raise
     finally:
         print("== Processo finalizado ==")
+
+# ---------------------------------------
+# 4) Funções para Spark
+# ---------------------------------------
+
+def spark_init(app_name: str = "TechChallenge3", master: str = "local[*]"):
+    """Inicializa SparkSession com configs básicas."""
+
+    try:
+        if 'spark' in locals() and spark is not None:
+            spark.stop()
+            print("🔄 Spark session anterior fechada")
+    except Exception as e:
+        print(f"⚠️  Erro ao fechar sessão Spark: {e}")
+
+    spark = (
+        SparkSession.builder
+            .appName(app_name)
+            .master(master)
+            .config("spark.sql.shuffle.partitions", "4")
+            .config("spark.driver.memory", "4g")
+            .config("spark.executor.memory", "4g")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.driver.host", "localhost")
+            .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3")
+            .getOrCreate())
+    
+    spark.sparkContext.setLogLevel("ERROR")
+    
+    print(f"✅ Spark inicializado: {app_name} [{master}]")
+    
+    return spark
+
+def spark_read_jdbc(spark: SparkSession = None, tabela: str = "", pgCfg: PgConfig = None, 
+                    PARTES: int = 12, FETCHSIZE: str = "50000"):
+    # Usar NTILE para criar uma coluna de partição sintética
+    # Viabilizando leitura em paralelo 
+    query = f"(SELECT *, ntile({PARTES}) OVER () AS __p FROM {tabela}) t"
+
+    return (spark.read.format("jdbc")
+            .option("url", pgCfg.jdbc_url)
+            .option("dbtable", query)
+            .option("partitionColumn", "__p")       # coluna numérica usada pra paralelizar a leitura
+            .option("lowerBound", "1")              # menor valor esperado em __p
+            .option("upperBound", str(PARTES))      # maior valor esperado em __p (= READ_PARTS)
+            .option("numPartitions", str(PARTES))   # número de partições/tarefas em paralelo
+            .option("fetchsize", FETCHSIZE)
+            .options(**pgCfg.jdbc_propriedades)
+            .load()
+            .drop("__p"))                           # remove a coluna auxiliar; não é dado “de verdade”
