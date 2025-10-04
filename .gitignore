@@ -1,5 +1,9 @@
 # Variaveis de Ambiente
 .env
 .DS_Store
+
 # Dados IBGE - não versionar
 arquivos_ibge/*
+
+# Python cache/artefatos
+__pycache__/
