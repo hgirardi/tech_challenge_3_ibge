@@ -58,7 +58,7 @@ def pgconfig_init(dotenv_path: Optional[str] = None,
     }
 
     print("✅ Configuração do Postgres carregada.")
-    
+
     return PgConfig(
         host=host, 
         port=port,
@@ -97,6 +97,7 @@ def pg_executar_sql(conn, sql: str):
     """Executa SQL do parametro"""
     
     print("== Executando SQL no Postgres ==")
+    print(sql)
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql)
@@ -121,6 +122,7 @@ def pg_executar_sql(conn, sql: str):
         raise
     finally:
         print("== Processo finalizado ==")
+        print("")
 
 # ---------------------------------------
 # 4) Funções para Spark
